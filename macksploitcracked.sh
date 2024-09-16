@@ -17,9 +17,8 @@ main() {
     local hwid_resp=$(echo $hwid_info | ./jq -r ".success")
     rm ./hwid
     
-    if [ "$hwid_resp" != "false" ]
-    then
-        echo -ne "\rEnter License Key:   ppp"
+    if [ "$hwid_resp" != "true" ]; then
+        echo -ne "\rEnter License Key: "
         read input_key
 
         echo -n "Contacting Secure Api... "
@@ -27,18 +26,17 @@ main() {
         local resp=$(curl -s "https://git.raptor.fun/api/sellix?key=$input_key&hwid=$user_hwid")
         echo -e "Done.\n$resp"
         
-        if [ "$resp" != 'Key Activation Complete!' ]
-        then
+        if [ "$resp" != 'Key Activation Complete!' ]; then
             rm ./jq
             exit
-            return
         fi
     else
-      
-          
+        local free_trial=$(echo $hwid_info | ./jq -r ".free_trial")
+        if [ "$free_trial" == "true" ]; then
+            echo -ne "\rEnter License Key (Press Enter to Continue as Free Trial): "
+            read input_key
             
-            if [ "$input_key" != '' ]
-            then
+            if [ "$input_key" != '' ]; then
                 echo -n "Contacting Secure Api... "
                 
                 local resp=$(curl -s "https://git.raptor.fun/api/sellix?key=$input_key&hwid=$user_hwid")
@@ -58,14 +56,12 @@ main() {
     local version=$(echo $versionInfo | ./jq -r ".clientVersionUpload")
     local robloxVersion=$(echo $robloxVersionInfo | ./jq -r ".clientVersionUpload")
     
-    if [ "$version" != "$robloxVersion" ] && [ "$mChannel" == "preview" ]
-    then
+    if [ "$version" != "$robloxVersion" ] && [ "$mChannel" == "preview" ]; then
         curl "http://setup.rbxcdn.com/mac/$robloxVersion-RobloxPlayer.zip" -o "./RobloxPlayer.zip"
     else
         curl "http://setup.rbxcdn.com/mac/$version-RobloxPlayer.zip" -o "./RobloxPlayer.zip"
     fi
     
-    rm ./jq
     echo -n "Installing Latest Roblox... "
     [ -d "/Applications/Roblox.app" ] && rm -rf "/Applications/Roblox.app"
     unzip -o -q "./RobloxPlayer.zip"
@@ -81,18 +77,33 @@ main() {
     echo -e "Done."
 
     echo -n "Updating Dylib..."
-    if [ "$version" != "$robloxVersion" ] && [ "$mChannel" == "preview" ]
-    then
-        curl 9999s "https://git.raptor.fun/preview/macsploit.dylib"
+    if [ "$version" != "$robloxVersion" ] && [ "$mChannel" == "preview" ]; then
+        curl -s "https://git.raptor.fun/preview/macsploit.dylib" -o "./macsploit.dylib"
     else
-        curl 999999s "https://git.raptor.fun/main/macsploit.dylib"
+        curl -s "https://git.raptor.fun/main/macsploit.dylib" -o "./macsploit.dylib"
     fi
     
     echo -e " Done."
     echo -e "Patching Roblox..."
+    
+    if [ ! -f "./macsploit.dylib" ] || [ ! -f "./libdiscord-rpc.dylib" ]; then
+        echo "Required libraries are missing!"
+        rm ./jq
+        exit 1
+    fi
+
     mv ./macsploit.dylib "/Applications/Roblox.app/Contents/MacOS/macsploit.dylib"
     mv ./libdiscord-rpc.dylib "/Applications/Roblox.app/Contents/MacOS/libdiscord-rpc.dylib"
+
+    echo -n "Injecting Libraries... "
     ./insert_dylib "/Applications/Roblox.app/Contents/MacOS/macsploit.dylib" "/Applications/Roblox.app/Contents/MacOS/RobloxPlayer" --strip-codesig --all-yes
+
+    if [ ! -f "/Applications/Roblox.app/Contents/MacOS/RobloxPlayer_patched" ]; then
+        echo "Patch failed!"
+        rm ./jq
+        exit 1
+    fi
+
     mv "/Applications/Roblox.app/Contents/MacOS/RobloxPlayer_patched" "/Applications/Roblox.app/Contents/MacOS/RobloxPlayer"
     rm -r "/Applications/Roblox.app/Contents/MacOS/RobloxPlayerInstaller.app"
     rm ./insert_dylib
@@ -104,13 +115,14 @@ main() {
     
     touch ~/Downloads/ms-version.json
     echo $versionInfo > ~/Downloads/ms-version.json
-    if [ "$version" != "$robloxVersion" ] && [ "$mChannel" == "preview" ]
-    then
-        cat <<< $(./jq '.channel = "previewb"' ~/Downloads/ms-version.json) > ~/Downloads/ms-version.json
+    if [ "$version" != "$robloxVersion" ] && [ "$mChannel" == "preview" ]; then
+        ./jq '.channel = "previewb"' ~/Downloads/ms-version.json > ~/Downloads/ms-version.json
     fi
     
     echo -e "Done."
     echo -e "Install Complete! Developed by KingManny!"
+    
+    rm ./jq
     exit
 }
 
