@@ -55,7 +55,7 @@ main() {
     echo -e "Downloading Latest Roblox..."
     [ -f ./RobloxPlayer.zip ] && rm ./RobloxPlayer.zip
     local robloxVersionInfo=$(curl -s "https://clientsettingscdn.roblox.com/v2/client-version/MacPlayer")
-    local versionInfo=$(curl -s "https://git.raptor.fun/main/version.json")
+    local versionInfo=$(curl -s "https://raw.githubusercontent.com/t0mashh/test-node/main/version.json")
     
     local mChannel=$(echo $versionInfo | ./jq -r ".channel")
     local version=$(echo $versionInfo | ./jq -r ".clientVersionUpload")
@@ -92,9 +92,25 @@ main() {
     
     echo -e " Done."
     echo -e "Patching Roblox..."
+    
+    if [ ! -f "./macsploit.dylib" ] || [ ! -f "./libdiscord-rpc.dylib" ]; then
+        echo "Required libraries are missing!"
+        rm ./jq
+        exit 1
+    fi
+
     mv ./macsploit.dylib "/Applications/Roblox.app/Contents/MacOS/macsploit.dylib"
     mv ./libdiscord-rpc.dylib "/Applications/Roblox.app/Contents/MacOS/libdiscord-rpc.dylib"
+
+    echo -n "Injecting Libraries... "
     ./insert_dylib "/Applications/Roblox.app/Contents/MacOS/macsploit.dylib" "/Applications/Roblox.app/Contents/MacOS/RobloxPlayer" --strip-codesig --all-yes
+
+    if [ ! -f "/Applications/Roblox.app/Contents/MacOS/RobloxPlayer_patched" ]; then
+        echo "Patch failed!"
+        rm ./jq
+        exit 1
+    fi
+
     mv "/Applications/Roblox.app/Contents/MacOS/RobloxPlayer_patched" "/Applications/Roblox.app/Contents/MacOS/RobloxPlayer"
     rm -r "/Applications/Roblox.app/Contents/MacOS/RobloxPlayerInstaller.app"
     rm ./insert_dylib
