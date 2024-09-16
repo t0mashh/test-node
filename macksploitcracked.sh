@@ -1,17 +1,27 @@
 #!/bin/bash
 
+set -e
+
+download_file() {
+    local url=$1
+    local dest=$2
+    curl -s "$url" -o "$dest" || { echo "Failed to download $url"; exit 1; }
+}
+
 main() {
     clear
     echo -e "Welcome to the MacSploit Experience!"
     echo -e "Install Script Version 2.6"
 
     echo -ne "Checking License..."
-    curl -s "https://git.raptor.fun/main/jq-macos-amd64" -o "./jq"
-    chmod +x ./jq
     
-    curl -s "https://git.raptor.fun/sellix/hwid" -o "./hwid"
+    # Download and setup necessary tools
+    download_file "https://git.raptor.fun/main/jq-macos-amd64" "./jq"
+    chmod +x ./jq
+    download_file "https://git.raptor.fun/sellix/hwid" "./hwid"
     chmod +x ./hwid
     
+    # Get hardware ID and verify license
     local user_hwid=$(./hwid)
     local hwid_info=$(curl -s "https://git.raptor.fun/api/whitelist?hwid=$user_hwid")
     local hwid_resp=$(echo $hwid_info | ./jq -r ".success")
@@ -20,12 +30,9 @@ main() {
     if [ "$hwid_resp" != "true" ]; then
         echo -ne "\rEnter License Key: "
         read input_key
-
         echo -n "Contacting Secure Api... "
-        
         local resp=$(curl -s "https://git.raptor.fun/api/sellix?key=$input_key&hwid=$user_hwid")
         echo -e "Done.\n$resp"
-        
         if [ "$resp" != 'Key Activation Complete!' ]; then
             rm ./jq
             exit
@@ -35,10 +42,8 @@ main() {
         if [ "$free_trial" == "true" ]; then
             echo -ne "\rEnter License Key (Press Enter to Continue as Free Trial): "
             read input_key
-            
             if [ "$input_key" != '' ]; then
                 echo -n "Contacting Secure Api... "
-                
                 local resp=$(curl -s "https://git.raptor.fun/api/sellix?key=$input_key&hwid=$user_hwid")
                 echo -e "Done.\n$resp"
             fi
@@ -57,9 +62,9 @@ main() {
     local robloxVersion=$(echo $robloxVersionInfo | ./jq -r ".clientVersionUpload")
     
     if [ "$version" != "$robloxVersion" ] && [ "$mChannel" == "preview" ]; then
-        curl "http://setup.rbxcdn.com/mac/$robloxVersion-RobloxPlayer.zip" -o "./RobloxPlayer.zip"
+        download_file "http://setup.rbxcdn.com/mac/$robloxVersion-RobloxPlayer.zip" "./RobloxPlayer.zip"
     else
-        curl "http://setup.rbxcdn.com/mac/$version-RobloxPlayer.zip" -o "./RobloxPlayer.zip"
+        download_file "http://setup.rbxcdn.com/mac/$version-RobloxPlayer.zip" "./RobloxPlayer.zip"
     fi
     
     echo -n "Installing Latest Roblox... "
@@ -70,7 +75,7 @@ main() {
     echo -e "Done."
 
     echo -e "Downloading MacSploit..."
-    curl "https://git.raptor.fun/main/macsploit.zip" -o "./MacSploit.zip"
+    download_file "https://git.raptor.fun/main/macsploit.zip" "./MacSploit.zip"
 
     echo -n "Installing MacSploit... "
     unzip -o -q "./MacSploit.zip"
@@ -78,9 +83,9 @@ main() {
 
     echo -n "Updating Dylib..."
     if [ "$version" != "$robloxVersion" ] && [ "$mChannel" == "preview" ]; then
-        curl -s "https://git.raptor.fun/preview/macsploit.dylib" -o "./macsploit.dylib"
+        download_file "https://git.raptor.fun/preview/macsploit.dylib" "./macsploit.dylib"
     else
-        curl -s "https://git.raptor.fun/main/macsploit.dylib" -o "./macsploit.dylib"
+        download_file "https://git.raptor.fun/main/macsploit.dylib" "./macsploit.dylib"
     fi
     
     echo -e " Done."
@@ -96,6 +101,12 @@ main() {
     mv ./libdiscord-rpc.dylib "/Applications/Roblox.app/Contents/MacOS/libdiscord-rpc.dylib"
 
     echo -n "Injecting Libraries... "
+    if [ ! -f "./insert_dylib" ]; then
+        echo "insert_dylib not found!"
+        rm ./jq
+        exit 1
+    fi
+    
     ./insert_dylib "/Applications/Roblox.app/Contents/MacOS/macsploit.dylib" "/Applications/Roblox.app/Contents/MacOS/RobloxPlayer" --strip-codesig --all-yes
 
     if [ ! -f "/Applications/Roblox.app/Contents/MacOS/RobloxPlayer_patched" ]; then
@@ -123,7 +134,6 @@ main() {
     echo -e "Install Complete! Developed by KingManny!"
     
     rm ./jq
-    exit
 }
 
 main
